@@ -2,16 +2,20 @@ const pty = require('node-pty');
 const express = require('express');
 const { execSync } = require('child_process');
 const http = require('http');
+const crypto = require('crypto');
 
 /**
- * WSL 拦截器 (Interceptor)
- * 版本: v2.1 - 增加注入延迟 & 多项选择适配
+ * HeyBuddy WSL 拦截器 (Interceptor)
+ * 版本: v2.2 - 增加 Session ID 握手校验，防止非关联进程触发弹窗
  */
 
-const VERSION = "v2.1";
+const VERSION = "v2.2";
 const app = express();
 const port = 18888;
 const WIN_LISTENER_PORT = 19999;
+
+// 生成本次运行的唯一 Session ID
+const SESSION_ID = crypto.randomBytes(8).toString('hex');
 
 app.use(express.json());
 
@@ -44,7 +48,9 @@ const ptyProcess = pty.spawn(args[0], args.slice(1), {
         ...process.env, 
         TERM: 'xterm-256color', 
         COLORTERM: 'truecolor',
-        FORCE_COLOR: '1'
+        FORCE_COLOR: '1',
+        // 注入 Session ID 供 Hook 读取
+        HEYBUDDY_SESSION_ID: SESSION_ID
     }
 });
 
@@ -82,10 +88,17 @@ const sendNetworkNotification = (callback) => {
 };
 
 app.post('/trigger-approval', (req, res) => {
-    console.log('\n[Interceptor] Received approval request...');
+    const receivedSessionId = req.body.session_id;
+
+    // 安全校验：只有当 Hook 传回的 Session ID 匹配时才触发弹窗
+    if (receivedSessionId !== SESSION_ID) {
+        console.log(`[Interceptor] Ignored unauthorized request (Session ID mismatch).`);
+        return res.status(403).send('Unauthorized');
+    }
+
+    console.log('\n[Interceptor] Received authorized approval request...');
     sendNetworkNotification((choice) => {
         console.log(`[Interceptor] User selected choice: ${choice}. Waiting for CLI to be ready...`);
-        // v2.1 核心改进：延迟 1000ms 注入，确保 Gemini 已经准备好接收输入
         setTimeout(() => {
             console.log(`[Interceptor] Injecting choice "${choice}" into PTY.`);
             ptyProcess.write(`${choice}\r`);
@@ -97,6 +110,7 @@ app.post('/trigger-approval', (req, res) => {
 app.listen(port, () => {
     console.log('=========================================');
     console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
+    console.log(`会话 ID: ${SESSION_ID}`);
     console.log(`监听端口: ${port}`);
     console.log(`目标宿主机 IP: ${HOST_IP}`);
     console.log('=========================================');

@@ -2,10 +2,11 @@
 
 本程序旨在解决在 WSL (Windows Subsystem for Linux) 环境中运行 Gemini CLI 时，无法直接在 Windows 宿主机接收交互授权提示的问题。
 
-版本：**v2.1** (最终稳定版)
+版本：**v2.2** (增加 Session 隔离功能)
 
 ## 🌟 核心特性
 
+- **Session ID 隔离**：只有通过 HeyBuddy 启动的进程才会触发弹窗，防止其他并发进程干扰。
 - **跨系统通信**：利用网络 (HTTP) 协议，绕过不稳定的 WSL Interop 限制，实现 WSL -> Windows 的精准弹窗。
 - **多项选择支持**：完美适配 Gemini CLI 的 4 选项菜单 (1. Allow once, 2. Allow for session, etc.)。
 - **防止中文乱码**：Windows 端采用 HTA (HTML Application) 技术，支持 UTF-16 编码，中文显示清爽无乱码。
