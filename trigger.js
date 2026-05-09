@@ -22,6 +22,8 @@ process.stdin.on('end', () => {
     let payload = {};
     try { 
         payload = JSON.parse(rawData); 
+        // 增加 DEBUG 日志，把完整的 payload 写到文件里，方便我们排查
+        require('fs').appendFileSync('/mnt/wsl/PHYSICALDRIVE3/gemini/hook/payload_debug.log', rawData + '\n\n');
     } catch(e) {}
 
     const postData = JSON.stringify({

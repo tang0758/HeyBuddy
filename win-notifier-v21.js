@@ -74,7 +74,7 @@ const server = http.createServer((req, res) => {
                 </div>
                 <button class="btn" onclick="select('ALLOW')">✅ <b>仅允许本次</b> (Allow once)</button>
                 <button class="btn" onclick="select('SESSION')">🕒 <b>本会话均允许</b> (Allow for session)</button>
-                <button class="btn" onclick="select('MODIFY')">📝 <b>打开编辑器修改</b> (Modify with external editor)</button>
+                <button class="btn" onclick="select('MANUAL')">💻 <b>特殊选项，主动回到CLI操作</b> (Manual Mode)</button>
                 <button class="btn btn-deny" onclick="select('CANCEL')">❌ <b>拒绝/取消</b> (Deny/Cancel)</button>
             </body>
             `;
