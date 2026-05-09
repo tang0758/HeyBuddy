@@ -1,4 +1,4 @@
-# 🚀 快速运行指南 (Quick Run)
+# 🚀 HeyBuddy 快速运行指南 (Quick Run)
 
 每天开始工作时，只需执行以下两步：
 

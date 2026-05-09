@@ -96,7 +96,7 @@ app.post('/trigger-approval', (req, res) => {
 
 app.listen(port, () => {
     console.log('=========================================');
-    console.log(`🚀 WSL 拦截器已启动 [版本: ${VERSION}]`);
+    console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
     console.log(`监听端口: ${port}`);
     console.log(`目标宿主机 IP: ${HOST_IP}`);
     console.log('=========================================');

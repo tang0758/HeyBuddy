@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
         fs.writeFileSync(resPath, '4');
 
         const htmlContent = `
-        <title>Gemini CLI 远程授权 v2.1</title>
+        <title>HeyBuddy 远程授权 v2.1</title>
         <hta:application id="oHTA" border="thin" innerborder="no" scroll="no" maximizebutton="no" minimizebutton="no" />
         <style>
             body { font-family: "Microsoft YaHei", "微软雅黑", sans-serif; background: #f3f3f3; padding: 20px; font-size: 14px; }
@@ -50,7 +50,7 @@ const server = http.createServer((req, res) => {
             window.moveTo((screen.width - 480) / 2, (screen.height - 420) / 2);
         </script>
         <body>
-            <h3>Gemini CLI 操作授权请求</h3>
+            <h3>HeyBuddy 操作授权请求</h3>
             <p class="note">来自 WSL 的指令需要您的确认：</p>
             <button class="btn" onclick="select(1)"><b>1. Allow once</b> (仅允许本次操作)</button>
             <button class="btn" onclick="select(2)"><b>2. Allow for this session</b> (本次会话均允许)</button>
@@ -93,4 +93,6 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Windows 通知监听器已启动 [版本: ${VERSION}]`);
     console.log(`监听地址: http://localhost:${PORT}`);
     console.log('=========================================');
+});
+=====');
 });

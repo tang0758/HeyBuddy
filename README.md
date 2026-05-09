@@ -1,4 +1,4 @@
-# Gemini CLI Notification Interceptor (WSL-to-Host)
+# HeyBuddy - CLI Notification Interceptor
 
 本程序旨在解决在 WSL (Windows Subsystem for Linux) 环境中运行 Gemini CLI 时，无法直接在 Windows 宿主机接收交互授权提示的问题。
 
