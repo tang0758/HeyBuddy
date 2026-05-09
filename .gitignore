@@ -1,0 +1,4 @@
+node_modules/
+*.txt
+*.hta
+temp_prompt.vbs
