@@ -62,8 +62,8 @@ const server = http.createServer((req, res) => {
                     } catch(e) { alert("写入结果失败: " + e.message); }
                     window.close();
                 }
-                window.resizeTo(500, 480);
-                window.moveTo((screen.width - 500) / 2, (screen.height - 480) / 2);
+                window.resizeTo(500, 520);
+                window.moveTo((screen.width - 500) / 2, (screen.height - 520) / 2);
             </script>
             <body>
                 <h3>HeyBuddy 操作授权</h3>
