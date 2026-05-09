@@ -92,11 +92,19 @@ const sendNetworkNotification = (promptMessage, toolName, callback) => {
     req.end();
 };
 
+let muteUntil = 0; // 静默期时间戳
+
 app.post('/trigger-approval', (req, res) => {
     const receivedSessionId = req.body.session_id;
 
     if (receivedSessionId !== SESSION_ID) {
         return res.status(403).send('Unauthorized');
+    }
+
+    // 检查是否处于静默期 (Manual 模式后)
+    if (Date.now() < muteUntil) {
+        console.log('\n[HeyBuddy] 🔕 拦截器当前处于静默期 (Manual Mode)。已跳过 Windows 弹窗，请在终端内完成操作。');
+        return res.sendStatus(200);
     }
 
     const promptMessage = req.body.message || "请求操作";
@@ -110,7 +118,11 @@ app.post('/trigger-approval', (req, res) => {
         switch(semanticChoice) {
             case 'ALLOW':   ptyInput = '1\r'; break;
             case 'SESSION': ptyInput = '2\r'; break;
-            case 'MODIFY':  ptyInput = '3\r'; break;
+            case 'MANUAL':
+                // 设置 30 秒的静默期
+                muteUntil = Date.now() + 30000;
+                console.log(`\n[HeyBuddy] 🔀 已交回控制权。未来 30 秒内 HeyBuddy 将保持静默，请直接在 WSL 终端中完成所有的手动选项（包括打开编辑器的二次确认）。`);
+                return; // 直接返回，不向 PTY 注入任何字符
             case 'CANCEL':  ptyInput = '\u001b'; break; // ESC 键
             default: ptyInput = '\u001b';
         }
