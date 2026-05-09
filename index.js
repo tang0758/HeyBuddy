@@ -6,10 +6,10 @@ const crypto = require('crypto');
 
 /**
  * HeyBuddy WSL 拦截器 (Interceptor)
- * 版本: v2.3 - 语义化按键映射 (支持 ESC 取消)
+ * 版本: v2.4 - 接收动态提示信息并转发给 Windows
  */
 
-const VERSION = "v2.3";
+const VERSION = "v2.4";
 const app = express();
 const port = 18888;
 const WIN_LISTENER_PORT = 19999;
@@ -61,14 +61,20 @@ ptyProcess.onExit(({ exitCode }) => {
     process.exit(exitCode);
 });
 
-const sendNetworkNotification = (callback) => {
+const sendNetworkNotification = (promptMessage, toolName, callback) => {
     console.log(`[HeyBuddy] Sending request to Windows host (${HOST_IP}:${WIN_LISTENER_PORT})...`);
     
+    const postData = JSON.stringify({ message: promptMessage, tool: toolName });
+
     const req = http.request({
         hostname: HOST_IP,
         port: WIN_LISTENER_PORT,
         method: 'POST',
-        timeout: 120000 
+        timeout: 120000,
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+        }
     }, (res) => {
         let rawData = '';
         res.on('data', (chunk) => { rawData += chunk; });
@@ -82,6 +88,7 @@ const sendNetworkNotification = (callback) => {
         callback('CANCEL');
     });
 
+    req.write(postData);
     req.end();
 };
 
@@ -92,25 +99,24 @@ app.post('/trigger-approval', (req, res) => {
         return res.status(403).send('Unauthorized');
     }
 
+    const promptMessage = req.body.message || "请求操作";
+    const toolName = req.body.tool || "Unknown";
+
     console.log('\n[HeyBuddy] Received authorized approval request...');
-    sendNetworkNotification((semanticChoice) => {
+    sendNetworkNotification(promptMessage, toolName, (semanticChoice) => {
         console.log(`[HeyBuddy] User chose: ${semanticChoice}. Mapping to PTY input...`);
         
-        // v2.3 核心改进：语义化映射
         let ptyInput = '';
         switch(semanticChoice) {
             case 'ALLOW':   ptyInput = '1\r'; break;
             case 'SESSION': ptyInput = '2\r'; break;
             case 'MODIFY':  ptyInput = '3\r'; break;
-            case 'CANCEL':  
-                // 发送 ESC 键 (\u001b)，这是 Gemini CLI 的通用取消键
-                ptyInput = '\u001b'; 
-                break;
+            case 'CANCEL':  ptyInput = '\u001b'; break; // ESC 键
             default: ptyInput = '\u001b';
         }
 
         setTimeout(() => {
-            console.log(`[HeyBuddy] Injecting "${semanticChoice}" (raw: ${JSON.stringify(ptyInput)}) into PTY.`);
+            console.log(`[HeyBuddy] Injecting "${semanticChoice}" into PTY.`);
             ptyProcess.write(ptyInput);
         }, 1000);
     });
