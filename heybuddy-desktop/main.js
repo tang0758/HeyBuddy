@@ -34,21 +34,21 @@ function createWindow() {
             }
         });
 
-        // v2.10: 使用 app.getAppPath() 替代 __dirname，这是 ASAR 内部最稳健的路径获取方式
-        const appPath = app.getAppPath();
-        const indexPath = path.join(appPath, 'index.html');
+        // v2.11: 终极防御 - 如果 Electron 原生协议解析失败，改用内存直接注入
+        const indexPath = path.join(__dirname, 'index.html');
         
         mainWindow.loadFile(indexPath).catch(err => {
-            // 调试：如果加载失败，列出 ASAR 内部文件列表
-            let files = [];
-            try { files = fs.readdirSync(appPath); } catch(e) { files = [e.message]; }
-            
-            dialog.showErrorBox('HeyBuddy v1.0.1 资源加载失败', 
-                `无法找到 index.html\n` +
-                `AppPath: ${appPath}\n` +
-                `包内文件列表: ${files.join(', ')}\n` +
-                `错误: ${err.message}`
-            );
+            console.log("原生加载失败，尝试内存注入模式...", err.message);
+            try {
+                // Node.js 的 fs 模块在 Electron 中被修饰过，可以完美读取 ASAR 内部文件
+                const htmlContent = fs.readFileSync(indexPath, 'utf8');
+                // 直接将读取到的字符串转为 Data URI 喂给浏览器引擎，彻底绕过路径解析 Bug
+                mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+            } catch (fallbackErr) {
+                dialog.showErrorBox('HeyBuddy v1.0.2 彻底绝望', 
+                    `文件存在但无法读取。\n路径: ${indexPath}\n错误: ${fallbackErr.message}`
+                );
+            }
         });
         
         mainWindow.on('close', (event) => {
