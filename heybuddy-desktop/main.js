@@ -1,43 +1,56 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
+
+// v2.6: 彻底禁用硬件加速，解决大部分打包后的闪退问题
+app.disableHardwareAcceleration();
 
 let mainWindow;
 let tray = null;
 let currentResponse = null;
 const PORT = 19999;
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 420,
-        height: 520,
-        show: true, // v2.5: 启动即显示，解决托盘不可见问题
-        frame: false, 
-        transparent: true, 
-        resizable: false,
-        alwaysOnTop: false, 
-        skipTaskbar: false, 
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false
-        }
-    });
+// 全局错误捕获：防止程序静默死亡
+process.on('uncaughtException', (error) => {
+    dialog.showErrorBox('HeyBuddy 运行异常', error.message || '未知内核错误');
+});
 
-    mainWindow.loadFile('index.html');
-    
-    // 窗口关闭时只是隐藏，除非程序退出
-    mainWindow.on('close', (event) => {
-        if (!app.isQuitting) {
-            event.preventDefault();
-            mainWindow.hide();
-        }
-    });
+function createWindow() {
+    try {
+        mainWindow = new BrowserWindow({
+            width: 420,
+            height: 520,
+            show: true,
+            frame: false, 
+            transparent: true, 
+            resizable: false,
+            alwaysOnTop: false, 
+            skipTaskbar: false, 
+            webPreferences: {
+                // 使用绝对路径解析
+                preload: path.join(__dirname, 'preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false
+            }
+        });
+
+        mainWindow.loadFile(path.join(__dirname, 'index.html')).catch(err => {
+            dialog.showErrorBox('资源加载失败', '无法找到 index.html，请确保文件完整。');
+        });
+        
+        mainWindow.on('close', (event) => {
+            if (!app.isQuitting) {
+                event.preventDefault();
+                mainWindow.hide();
+            }
+        });
+    } catch (e) {
+        dialog.showErrorBox('创建窗口失败', e.message);
+    }
 }
 
 function createTray() {
     try {
-        // 使用一个极其简单的红色正方形 Base64，确保 100% 合法
         const b64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAcSURBVDhPY/zPQAIMo/7DB8bDAxjwk+YjA4OQjZgAAI2fH1i08Xf1AAAAAElFTkSuQmCC';
         const icon = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
         tray = new Tray(icon);
@@ -49,7 +62,7 @@ function createTray() {
         tray.setContextMenu(contextMenu);
         tray.setToolTip('HeyBuddy');
     } catch (e) {
-        console.log("托盘启动失败 (环境不支持)，将仅使用任务栏图标。");
+        console.log("托盘启动失败 (环境不支持)");
     }
 }
 
@@ -73,9 +86,7 @@ function startHttpServer() {
                 }
                 currentResponse = res;
 
-                // 发送信号给 UI，切换到“授权模式”
                 mainWindow.webContents.send('show-prompt', { msg: promptMsg, tool: toolName });
-                
                 mainWindow.center();
                 mainWindow.show();
                 mainWindow.focus();
@@ -83,8 +94,14 @@ function startHttpServer() {
             });
         } else {
             res.writeHead(200);
-            res.end('HeyBuddy Desktop is running...');
+            res.end('HeyBuddy Desktop v2.6 is running...');
         }
+    });
+
+    // 监听端口错误（如端口被占用）
+    server.on('error', (e) => {
+        dialog.showErrorBox('网络启动失败', `端口 ${PORT} 启动失败: ${e.message}\n请检查是否有其他 HeyBuddy 实例正在运行。`);
+        app.quit();
     });
 
     server.listen(PORT, '0.0.0.0', () => {
@@ -103,9 +120,12 @@ app.whenReady().then(() => {
 });
 
 ipcMain.on('user-choice', (event, choice) => {
-    // 如果是普通点击隐藏（比如 MANUAL 或取消），窗口隐藏但不置顶
-    mainWindow.setAlwaysOnTop(false);
-    mainWindow.hide();
+    if (choice !== 'IDLE') {
+        mainWindow.setAlwaysOnTop(false);
+        mainWindow.hide();
+    } else {
+        mainWindow.hide();
+    }
 
     if (currentResponse && !currentResponse.writableEnded) {
         currentResponse.writeHead(200, { 'Content-Type': 'text/plain' });
