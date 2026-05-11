@@ -40,9 +40,19 @@ function createWindow() {
 }
 
 function createTray() {
-    // 读取本地物理图标文件
-    const iconPath = path.join(__dirname, 'icon.png');
-    tray = new Tray(iconPath);
+    // 使用纯内存 base64 创建图标 (红色小方块)
+    // 使用已知绝对合法的 PNG 编码，避免加载本地文件报错
+    const { nativeImage } = require('electron');
+    const b64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAcSURBVDhPY/zPQAIMo/7DB8bDAxjwk+YjA4OQjZgAAI2fH1i08Xf1AAAAAElFTkSuQmCC';
+    const icon = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
+    
+    try {
+        tray = new Tray(icon);
+    } catch (e) {
+        console.error("创建托盘图标失败:", e);
+        return;
+    }
+    
     const contextMenu = Menu.buildFromTemplate([
         { label: 'HeyBuddy Listener', enabled: false },
         { type: 'separator' },
