@@ -11,11 +11,11 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 420,
         height: 520,
-        show: false, 
+        show: true, // v2.5: 启动即显示，解决托盘不可见问题
         frame: false, 
         transparent: true, 
         resizable: false,
-        alwaysOnTop: true, 
+        alwaysOnTop: false, 
         skipTaskbar: false, 
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -26,43 +26,30 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
     
+    // 窗口关闭时只是隐藏，除非程序退出
     mainWindow.on('close', (event) => {
         if (!app.isQuitting) {
             event.preventDefault();
             mainWindow.hide();
-            if (currentResponse && !currentResponse.writableEnded) {
-                currentResponse.writeHead(200, { 'Content-Type': 'text/plain' });
-                currentResponse.end('CANCEL');
-                currentResponse = null;
-            }
         }
     });
 }
 
 function createTray() {
-    // 使用纯内存 base64 创建图标 (红色小方块)
-    // 使用已知绝对合法的 PNG 编码，避免加载本地文件报错
-    const { nativeImage } = require('electron');
-    const b64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAcSURBVDhPY/zPQAIMo/7DB8bDAxjwk+YjA4OQjZgAAI2fH1i08Xf1AAAAAElFTkSuQmCC';
-    const icon = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
-    
     try {
+        const b64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAcSURBVDhPY/zPQAIMo/7DB8bDAxjwk+YjA4OQjZgAAI2fH1i08Xf1AAAAAElFTkSuQmCC';
+        const icon = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
         tray = new Tray(icon);
+        const contextMenu = Menu.buildFromTemplate([
+            { label: '显示面板', click: () => mainWindow.show() },
+            { type: 'separator' },
+            { label: '退出 HeyBuddy', click: () => { app.isQuitting = true; app.quit(); } }
+        ]);
+        tray.setContextMenu(contextMenu);
+        tray.setToolTip('HeyBuddy Listener');
     } catch (e) {
-        console.error("创建托盘图标失败:", e);
-        return;
+        console.log("托盘初始化失败 (系统限制)，已忽略。");
     }
-    
-    const contextMenu = Menu.buildFromTemplate([
-        { label: 'HeyBuddy Listener', enabled: false },
-        { type: 'separator' },
-        { label: 'Quit', click: () => {
-            app.isQuitting = true;
-            app.quit();
-        }}
-    ]);
-    tray.setToolTip('HeyBuddy Listener');
-    tray.setContextMenu(contextMenu);
 }
 
 function startHttpServer() {
@@ -85,17 +72,13 @@ function startHttpServer() {
                 }
                 currentResponse = res;
 
+                // 发送信号给 UI，切换到“授权模式”
                 mainWindow.webContents.send('show-prompt', { msg: promptMsg, tool: toolName });
                 
-                // 将窗口居中并显示
                 mainWindow.center();
                 mainWindow.show();
                 mainWindow.focus();
-                
-                // Windows 特性：强制闪烁任务栏或前台显示
-                if (process.platform === 'win32') {
-                    mainWindow.setAlwaysOnTop(true, 'screen-saver');
-                }
+                mainWindow.setAlwaysOnTop(true, 'screen-saver');
             });
         } else {
             res.writeHead(200);
@@ -104,7 +87,7 @@ function startHttpServer() {
     });
 
     server.listen(PORT, '0.0.0.0', () => {
-        console.log(`HeyBuddy Server running on port ${PORT}`);
+        console.log(`🚀 HeyBuddy Server running on port ${PORT}`);
     });
 }
 
@@ -119,7 +102,10 @@ app.whenReady().then(() => {
 });
 
 ipcMain.on('user-choice', (event, choice) => {
+    // 如果是普通点击隐藏（比如 MANUAL 或取消），窗口隐藏但不置顶
+    mainWindow.setAlwaysOnTop(false);
     mainWindow.hide();
+
     if (currentResponse && !currentResponse.writableEnded) {
         currentResponse.writeHead(200, { 'Content-Type': 'text/plain' });
         currentResponse.end(choice);
