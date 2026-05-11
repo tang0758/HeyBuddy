@@ -34,8 +34,8 @@ function createWindow() {
             }
         });
 
-        mainWindow.loadFile(path.join(__dirname, 'index.html')).catch(err => {
-            dialog.showErrorBox('资源加载失败', '无法找到 index.html，请确保文件完整。');
+        mainWindow.loadFile('index.html').catch(err => {
+            dialog.showErrorBox('资源加载失败', `无法找到 index.html\nAppPath: ${app.getAppPath()}\nError: ${err.message}`);
         });
         
         mainWindow.on('close', (event) => {
