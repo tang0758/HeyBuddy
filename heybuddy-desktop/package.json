@@ -11,6 +11,12 @@
   "build": {
     "appId": "com.heybuddy.notifier",
     "productName": "HeyBuddy",
+    "files": [
+      "main.js",
+      "index.html",
+      "preload.js",
+      "package.json"
+    ],
     "directories": {
       "output": "dist"
     },
