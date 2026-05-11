@@ -40,11 +40,9 @@ function createWindow() {
 }
 
 function createTray() {
-    // 使用纯内存 base64 创建图标 (蓝色小方块)
-    const emptyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAH0lEQVQ4T2P8z8AAROQDxlEDGA0aQIPwAGk/hM4AAAAASUVORK5CYII=', 'base64');
-    const icon = nativeImage.createFromBuffer(emptyPng);
-    
-    tray = new Tray(icon);
+    // 读取本地物理图标文件
+    const iconPath = path.join(__dirname, 'icon.png');
+    tray = new Tray(iconPath);
     const contextMenu = Menu.buildFromTemplate([
         { label: 'HeyBuddy Listener', enabled: false },
         { type: 'separator' },
