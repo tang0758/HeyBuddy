@@ -37,18 +37,19 @@ function createWindow() {
 
 function createTray() {
     try {
+        // 使用一个极其简单的红色正方形 Base64，确保 100% 合法
         const b64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAcSURBVDhPY/zPQAIMo/7DB8bDAxjwk+YjA4OQjZgAAI2fH1i08Xf1AAAAAElFTkSuQmCC';
         const icon = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'));
         tray = new Tray(icon);
         const contextMenu = Menu.buildFromTemplate([
-            { label: '显示面板', click: () => mainWindow.show() },
+            { label: '显示 HeyBuddy 面板', click: () => mainWindow.show() },
             { type: 'separator' },
-            { label: '退出 HeyBuddy', click: () => { app.isQuitting = true; app.quit(); } }
+            { label: '退出程序', click: () => { app.isQuitting = true; app.quit(); } }
         ]);
         tray.setContextMenu(contextMenu);
-        tray.setToolTip('HeyBuddy Listener');
+        tray.setToolTip('HeyBuddy');
     } catch (e) {
-        console.log("托盘初始化失败 (系统限制)，已忽略。");
+        console.log("托盘启动失败 (环境不支持)，将仅使用任务栏图标。");
     }
 }
 
