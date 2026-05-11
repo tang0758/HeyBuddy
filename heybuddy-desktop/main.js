@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
+const url = require('url');
+const fs = require('fs');
 
-// v2.6: 彻底禁用硬件加速，解决大部分打包后的闪退问题
+// v2.9: 增强路径解析与错误诊断
 app.disableHardwareAcceleration();
 
 let mainWindow;
@@ -10,9 +12,8 @@ let tray = null;
 let currentResponse = null;
 const PORT = 19999;
 
-// 全局错误捕获：防止程序静默死亡
 process.on('uncaughtException', (error) => {
-    dialog.showErrorBox('HeyBuddy 运行异常', error.message || '未知内核错误');
+    dialog.showErrorBox('HeyBuddy 运行异常', error.stack || error.message);
 });
 
 function createWindow() {
@@ -27,15 +28,30 @@ function createWindow() {
             alwaysOnTop: false, 
             skipTaskbar: false, 
             webPreferences: {
-                // 使用绝对路径解析
                 preload: path.join(__dirname, 'preload.js'),
                 contextIsolation: true,
                 nodeIntegration: false
             }
         });
 
-        mainWindow.loadFile('index.html').catch(err => {
-            dialog.showErrorBox('资源加载失败', `无法找到 index.html\nAppPath: ${app.getAppPath()}\nError: ${err.message}`);
+        // 使用最稳健的 URL 格式加载文件
+        const indexPath = path.join(__dirname, 'index.html');
+        
+        mainWindow.loadURL(url.format({
+            pathname: indexPath,
+            protocol: 'file:',
+            slashes: true
+        })).catch(err => {
+            // 调试：如果加载失败，尝试列出当前目录内容
+            let files = [];
+            try { files = fs.readdirSync(__dirname); } catch(e) { files = [e.message]; }
+            
+            dialog.showErrorBox('资源加载失败', 
+                `无法找到 index.html\n` +
+                `当前目录 (__dirname): ${__dirname}\n` +
+                `目录文件列表: ${files.join(', ')}\n` +
+                `错误: ${err.message}`
+            );
         });
         
         mainWindow.on('close', (event) => {
