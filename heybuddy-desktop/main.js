@@ -34,22 +34,19 @@ function createWindow() {
             }
         });
 
-        // 使用最稳健的 URL 格式加载文件
-        const indexPath = path.join(__dirname, 'index.html');
+        // v2.10: 使用 app.getAppPath() 替代 __dirname，这是 ASAR 内部最稳健的路径获取方式
+        const appPath = app.getAppPath();
+        const indexPath = path.join(appPath, 'index.html');
         
-        mainWindow.loadURL(url.format({
-            pathname: indexPath,
-            protocol: 'file:',
-            slashes: true
-        })).catch(err => {
-            // 调试：如果加载失败，尝试列出当前目录内容
+        mainWindow.loadFile(indexPath).catch(err => {
+            // 调试：如果加载失败，列出 ASAR 内部文件列表
             let files = [];
-            try { files = fs.readdirSync(__dirname); } catch(e) { files = [e.message]; }
+            try { files = fs.readdirSync(appPath); } catch(e) { files = [e.message]; }
             
-            dialog.showErrorBox('资源加载失败', 
+            dialog.showErrorBox('HeyBuddy v1.0.1 资源加载失败', 
                 `无法找到 index.html\n` +
-                `当前目录 (__dirname): ${__dirname}\n` +
-                `目录文件列表: ${files.join(', ')}\n` +
+                `AppPath: ${appPath}\n` +
+                `包内文件列表: ${files.join(', ')}\n` +
                 `错误: ${err.message}`
             );
         });
