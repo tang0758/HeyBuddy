@@ -1,10 +1,12 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
-const url = require('url');
-const fs = require('fs');
 
-// v2.9: 增强路径解析与错误诊断
+/**
+ * HeyBuddy Desktop Notifier
+ * 版本: v2.12 - 彻底禁用 ASAR 模式，使用物理路径直接加载
+ */
+
 app.disableHardwareAcceleration();
 
 let mainWindow;
@@ -17,49 +19,35 @@ process.on('uncaughtException', (error) => {
 });
 
 function createWindow() {
-    try {
-        mainWindow = new BrowserWindow({
-            width: 420,
-            height: 520,
-            show: true,
-            frame: false, 
-            transparent: true, 
-            resizable: false,
-            alwaysOnTop: false, 
-            skipTaskbar: false, 
-            webPreferences: {
-                preload: path.join(__dirname, 'preload.js'),
-                contextIsolation: true,
-                nodeIntegration: false
-            }
-        });
+    mainWindow = new BrowserWindow({
+        width: 420,
+        height: 520,
+        show: true,
+        frame: false, 
+        transparent: true, 
+        resizable: false,
+        alwaysOnTop: false, 
+        skipTaskbar: false, 
+        webPreferences: {
+            // 物理路径直接引用
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+        }
+    });
 
-        // v2.11: 终极防御 - 如果 Electron 原生协议解析失败，改用内存直接注入
-        const indexPath = path.join(__dirname, 'index.html');
-        
-        mainWindow.loadFile(indexPath).catch(err => {
-            console.log("原生加载失败，尝试内存注入模式...", err.message);
-            try {
-                // Node.js 的 fs 模块在 Electron 中被修饰过，可以完美读取 ASAR 内部文件
-                const htmlContent = fs.readFileSync(indexPath, 'utf8');
-                // 直接将读取到的字符串转为 Data URI 喂给浏览器引擎，彻底绕过路径解析 Bug
-                mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
-            } catch (fallbackErr) {
-                dialog.showErrorBox('HeyBuddy v1.0.2 彻底绝望', 
-                    `文件存在但无法读取。\n路径: ${indexPath}\n错误: ${fallbackErr.message}`
-                );
-            }
-        });
-        
-        mainWindow.on('close', (event) => {
-            if (!app.isQuitting) {
-                event.preventDefault();
-                mainWindow.hide();
-            }
-        });
-    } catch (e) {
-        dialog.showErrorBox('创建窗口失败', e.message);
-    }
+    // v2.12: 由于关闭了 ASAR，__dirname 将指向真实的硬盘文件夹，loadFile 不会再失败
+    const indexPath = path.join(__dirname, 'index.html');
+    mainWindow.loadFile(indexPath).catch(err => {
+        dialog.showErrorBox('资源加载失败 v1.0.3', `路径: ${indexPath}\n错误: ${err.message}`);
+    });
+    
+    mainWindow.on('close', (event) => {
+        if (!app.isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+        }
+    });
 }
 
 function createTray() {
@@ -73,10 +61,7 @@ function createTray() {
             { label: '退出程序', click: () => { app.isQuitting = true; app.quit(); } }
         ]);
         tray.setContextMenu(contextMenu);
-        tray.setToolTip('HeyBuddy');
-    } catch (e) {
-        console.log("托盘启动失败 (环境不支持)");
-    }
+    } catch (e) {}
 }
 
 function startHttpServer() {
@@ -100,6 +85,7 @@ function startHttpServer() {
                 currentResponse = res;
 
                 mainWindow.webContents.send('show-prompt', { msg: promptMsg, tool: toolName });
+                
                 mainWindow.center();
                 mainWindow.show();
                 mainWindow.focus();
@@ -107,13 +93,12 @@ function startHttpServer() {
             });
         } else {
             res.writeHead(200);
-            res.end('HeyBuddy Desktop v2.6 is running...');
+            res.end('HeyBuddy Desktop v1.0.3 is running...');
         }
     });
 
-    // 监听端口错误（如端口被占用）
     server.on('error', (e) => {
-        dialog.showErrorBox('网络启动失败', `端口 ${PORT} 启动失败: ${e.message}\n请检查是否有其他 HeyBuddy 实例正在运行。`);
+        dialog.showErrorBox('网络启动失败', `端口 ${PORT} 启动失败: ${e.message}`);
         app.quit();
     });
 

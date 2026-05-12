@@ -1,28 +1,25 @@
 {
   "name": "heybuddy-desktop",
-  "version": "1.0.2",
-  "description": "",
+  "version": "1.0.3",
+  "description": "HeyBuddy Desktop Notifier",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac"
+    "build:win": "electron-builder --win --x64"
   },
   "build": {
     "appId": "com.heybuddy.notifier",
     "productName": "HeyBuddy",
+    "asar": false,
     "directories": {
       "output": "dist"
     },
     "win": {
       "target": "portable"
-    },
-    "mac": {
-      "target": "dmg"
     }
   },
   "keywords": [],
-  "author": "",
+  "author": "HeyBuddy",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
