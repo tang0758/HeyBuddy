@@ -133,6 +133,12 @@ app.listen(port, () => {
     console.log('=========================================');
     console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
     console.log(`会话 ID: ${SESSION_ID}`);
+    console.log(`配置来源: ${process.env.HEYBUDDY_HOST ? '环境变量' : '自动探测'}`);
+    console.log(`目标宿主机: ${HOST_IP}:${WIN_LISTENER_PORT}`);
+    console.log('=========================================');
+});
+ console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
+    console.log(`会话 ID: ${SESSION_ID}`);
     console.log(`目标宿主机 IP: ${HOST_IP}`);
     console.log('=========================================');
 });

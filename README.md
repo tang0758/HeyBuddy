@@ -2,11 +2,13 @@
 
 本程序旨在解决在 WSL (Windows Subsystem for Linux) 环境中运行 Gemini CLI 时，无法直接在 Windows 宿主机接收交互授权提示的问题。
 
-版本：**v3.3** (Flutter Native 原生版)
+版本：**v3.5** (灵活配置版)
 
 ## 🌟 核心特性
 
-- **Flutter 原生驱动**：彻底抛弃 Electron 路径 Bug，编译为原生 C++/Win32 机器码，启动速度提升 500%。
+- **灵活网络配置**：支持通过 `HEYBUDDY_HOST` 环境变量手动指定目标 IP 和端口，适配远程服务器或非标准 WSL 网络。
+- **像素级原生 UI**：修复了 Windows 下的直角透明层问题，实现真正的 24px 大圆角与高斯模糊阴影。
+- **Flutter 原生驱动**：彻底抛弃 Electron 路径 Bug，编译为原生 C++/Win32 机器码。
 - **语义化按键映射**：支持 `ESC` 通用取消与 1-4 数字映射，适配所有 CLI 菜单。
 - **动态 Prompt 捕捉**：弹窗实时显示 Gemini 当前的提示文字，明确“二次确认”的原因。
 - **跨系统通信**：基于稳定 HTTP 协议，完美穿透 WSL 与 Windows 网络。
@@ -30,6 +32,12 @@ flutter run -d windows
 ```bash
 cd /mnt/wsl/PHYSICALDRIVE3/gemini/hook
 source ./cli-interceptor/proxy.sh
+
+# 默认模式 (自动探测 Windows IP)
+node index.js gemini "你的指令"
+
+# 自定义模式 (手动指定宿主机 IP 和端口)
+export HEYBUDDY_HOST="192.168.1.100:19999"
 node index.js gemini "你的指令"
 ```
 
