@@ -1,42 +1,45 @@
 #!/bin/bash
 
 # =================================================================
-# HeyBuddy 自动化部署与环境准备脚本 (Deployment Agent)
-# 职责：确保 WSL 端的最新代码完美同步到 Windows 物理机
+# HeyBuddy 自动化部署与环境准备脚本 (Deployment Agent v3.0)
+# 支持 Electron (desktop) 和 Flutter (native) 两种架构的同步
 # =================================================================
 
-WSL_SOURCE_DIR="/mnt/wsl/PHYSICALDRIVE3/gemini/hook/heybuddy-desktop"
-WIN_TARGET_DIR="/mnt/e/aicoding/gemini/hook/heybuddy-desktop"
+PROJECT_TYPE=${1:-"flutter"} # 默认同步 flutter
+
+if [ "$PROJECT_TYPE" == "electron" ]; then
+    WSL_SOURCE_DIR="/mnt/wsl/PHYSICALDRIVE3/gemini/hook/heybuddy-desktop"
+    WIN_TARGET_DIR="/mnt/e/aicoding/gemini/hook/heybuddy-desktop"
+    FILES=("main.js" "package.json" "index.html" "preload.js")
+else
+    WSL_SOURCE_DIR="/mnt/wsl/PHYSICALDRIVE3/gemini/hook/heybuddy-flutter"
+    WIN_TARGET_DIR="/mnt/e/aicoding/gemini/hook/heybuddy-flutter"
+    FILES=("pubspec.yaml" "lib/main.dart")
+fi
 
 echo "🤖 启动部署机器人 (Deployment Agent)..."
+echo "目标模式: $PROJECT_TYPE"
 echo "================================================================="
 
 # 1. 检查目标目录是否存在
-if [ ! -d "$WIN_TARGET_DIR" ]; then
-    echo "⚠️  Windows 目标目录不存在，正在为您创建..."
-    mkdir -p "$WIN_TARGET_DIR"
-fi
+mkdir -p "$WIN_TARGET_DIR/lib"
 
-echo "📦 正在对比并同步最新代码至 Windows (E盘)..."
+echo "📦 正在同步代码至 Windows (E盘)..."
 
-# 2. 同步核心文件
-cp -v "$WSL_SOURCE_DIR/main.js" "$WIN_TARGET_DIR/"
-cp -v "$WSL_SOURCE_DIR/package.json" "$WIN_TARGET_DIR/"
-cp -v "$WSL_SOURCE_DIR/index.html" "$WIN_TARGET_DIR/"
-cp -v "$WSL_SOURCE_DIR/preload.js" "$WIN_TARGET_DIR/"
-
-# 3. 同步图标文件 (如果有)
-if [ -f "$WSL_SOURCE_DIR/icon.png" ]; then
-    cp -v "$WSL_SOURCE_DIR/icon.png" "$WIN_TARGET_DIR/"
-    echo "✅ 图标文件 (icon.png) 同步成功。"
-else
-    echo "⚠️ 未找到自定义图标文件，将使用默认图标。"
-fi
+# 2. 循环同步文件
+for file in "${FILES[@]}"; do
+    if [ -f "$WSL_SOURCE_DIR/$file" ]; then
+        cp -v "$WSL_SOURCE_DIR/$file" "$WIN_TARGET_DIR/$file"
+    fi
+done
 
 echo "================================================================="
-echo "🎉 部署完成！Windows 端代码已是最新。"
+echo "🎉 $PROJECT_TYPE 项目同步完成！"
 echo ""
-echo "👉 接下来，请在 Windows 终端中执行："
-echo "   1. 确保在目录: E:\aicoding\gemini\hook\heybuddy-desktop"
-echo "   2. 运行测试: npm start"
-echo "   3. (或) 重新打包: npm run build:win"
+if [ "$PROJECT_TYPE" == "flutter" ]; then
+    echo "👉 下一步 (Windows 侧):"
+    echo "   1. 确保安装了 Flutter SDK 和 VS Build Tools"
+    echo "   2. cd E:\aicoding\gemini\hook\heybuddy-flutter"
+    echo "   3. flutter pub get"
+    echo "   4. flutter run -d windows"
+fi

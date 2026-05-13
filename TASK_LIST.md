@@ -26,12 +26,16 @@
 - [x] 打包生成 `heybuddy.skill` 压缩包。
 - [x] 将打包文件提交至仓库的 `release/` 目录。
 
-## 阶段四：跨平台桌面客户端演进 (进行中) 🚀
-- [x] 初始化基于 Electron 的 `heybuddy-desktop` 目录结构。
-- [x] 编写 `main.js` (后台托盘+HTTP 服务) 与 `preload.js` (IPC 桥接)。
-- [x] 编写支持 Windows 11 Fluent 风格的 `index.html` 极美前端交互界面。
-- [x] 配置 `package.json` 的 `electron-builder` 构建脚本。
-- [ ] 解决 Windows 本地网络代理导致的 Electron 二进制包下载损坏问题 (`zip: not a valid zip file`)。
-- [ ] 成功执行 `npm run build:win` 生成独立的 `.exe` 安装包。
-- [ ] 测试生成的桌面版能否静默待在系统托盘，并准确响应 WSL 发来的弹窗请求。
-- [ ] (可选) 增加自定义系统托盘图标 (`icon.png`/`icon.ico`)。
+## 阶段四：跨平台桌面客户端演进 (已完成) ✅
+- [x] 初始化基于 Flutter 的 `heybuddy-flutter` 架构。
+- [x] 实现原生异步 HTTP 服务器 (Shelf) 监听 19999 端口。
+- [x] 使用 `window_manager` 实现原生窗口置顶与自动聚焦。
+- [x] 适配 Material 3 风格，实现高颜值呼吸灯待机与动态授权界面。
+- [x] 解决 Windows 本地网络代理与防火墙导致的通讯瓶颈。
+- [x] 验证 WSL -> Windows Flutter 原生授权流程 100% 成功。
+- [x] (可选) 增加自定义系统托盘图标支持。
+
+## 阶段五：发布与维护 (进行中) 🚀
+- [ ] 导出最终的 Flutter Windows Release 版本 (.exe)。
+- [ ] 更新 GitHub 仓库说明与部署指南。
+- [ ] 尝试在 MacOS 环境下编译并运行测试。

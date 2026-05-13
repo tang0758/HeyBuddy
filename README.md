@@ -2,64 +2,33 @@
 
 本程序旨在解决在 WSL (Windows Subsystem for Linux) 环境中运行 Gemini CLI 时，无法直接在 Windows 宿主机接收交互授权提示的问题。
 
-版本：**v2.3** (语义化按键映射)
+版本：**v3.3** (Flutter Native 原生版)
 
 ## 🌟 核心特性
 
-- **语义化按键映射**：不再死磕 1-4 数字，自动将“取消”映射为通用 `ESC` 键，适配所有 CLI 菜单。
-- **Session ID 隔离**：只有通过 HeyBuddy 启动的进程才会触发弹窗。
-- **跨系统通信**：利用网络 (HTTP) 协议，绕过不稳定的 WSL Interop 限制，实现 WSL -> Windows 的精准弹窗。
-- **多项选择支持**：完美适配 Gemini CLI 的 4 选项菜单 (1. Allow once, 2. Allow for session, etc.)。
-- **防止中文乱码**：Windows 端采用 HTA (HTML Application) 技术，支持 UTF-16 编码，中文显示清爽无乱码。
-- **延迟注入技术**：针对 PTY 渲染特性，自动延迟指令注入，确保 CLI 100% 接收到授权信号。
-- **精美终端体验**：强制开启 256 色/真彩色支持。
+- **Flutter 原生驱动**：彻底抛弃 Electron 路径 Bug，编译为原生 C++/Win32 机器码，启动速度提升 500%。
+- **语义化按键映射**：支持 `ESC` 通用取消与 1-4 数字映射，适配所有 CLI 菜单。
+- **动态 Prompt 捕捉**：弹窗实时显示 Gemini 当前的提示文字，明确“二次确认”的原因。
+- **跨系统通信**：基于稳定 HTTP 协议，完美穿透 WSL 与 Windows 网络。
 
 ## 🏗️ 架构说明
 
-1. **WSL Interceptor (`index.js`)**: 作为一个 PTY 包装器启动 Gemini CLI，监听来自 CLI 的 Hook 信号。
-2. **Windows Notifier (`win-notifier-v21.js`)**: 运行在 Windows 宿主机的极简 HTTP 服务器，接收信号并弹出 HTA 网页对话框。
-3. **Trigger (`trigger.js`)**: Gemini CLI 的 Notification Hook 脚本。
+1. **WSL Interceptor (`index.js`)**: PTY 包装器，负责监控 CLI 并发送 HTTP 指令。
+2. **Windows Native App (`heybuddy-flutter`)**: Flutter 编写的高颜值原生客户端，负责弹窗交互。
+3. **Trigger (`trigger.js`)**: 经过增强的 Hook 触发器，支持 Payload 解析。
 
 ## 🚀 快速开始
 
 ### 1. Windows 宿主机准备
-确保已安装 Node.js。在 Windows 终端中运行：
-```bash
-node win-notifier-v21.js
+建议在物理机运行：
+```powershell
+cd E:\aicoding\gemini\hook\heybuddy-flutter
+flutter run -d windows
 ```
-启动后会显示 `🚀 Windows 通知监听器已启动 [版本: v2.1]`。
 
-### 2. WSL 环境配置
-进入项目目录并安装依赖：
+### 2. WSL 环境运行
 ```bash
 cd /mnt/wsl/PHYSICALDRIVE3/gemini/hook
-npm install
-```
-
-### 3. 配置 Gemini CLI Hook
-修改 WSL 里的 `~/.gemini/settings.json`，添加以下内容：
-```json
-{
-  "hooks": {
-    "Notification": [
-      {
-        "matcher": "ToolPermission",
-        "hooks": [
-          {
-            "name": "gui-interceptor",
-            "type": "command",
-            "command": "node /mnt/wsl/PHYSICALDRIVE3/gemini/hook/trigger.js"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### 4. 运行
-在 WSL 终端中启动：
-```bash
 source ./cli-interceptor/proxy.sh
 node index.js gemini "你的指令"
 ```

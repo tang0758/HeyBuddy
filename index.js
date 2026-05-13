@@ -6,10 +6,10 @@ const crypto = require('crypto');
 
 /**
  * HeyBuddy WSL 拦截器 (Interceptor)
- * 版本: v2.4 - 接收动态提示信息并转发给 Windows
+ * 版本: v3.3 - 增强网络调试日志 (适配 Flutter 版)
  */
 
-const VERSION = "v2.4";
+const VERSION = "v3.3";
 const app = express();
 const port = 18888;
 const WIN_LISTENER_PORT = 19999;
@@ -62,13 +62,14 @@ ptyProcess.onExit(({ exitCode }) => {
 });
 
 const sendNetworkNotification = (promptMessage, toolName, callback) => {
-    console.log(`[HeyBuddy] Sending request to Windows host (${HOST_IP}:${WIN_LISTENER_PORT})...`);
+    console.log(`[HeyBuddy] 📡 正在发送请求到 Windows 宿主机 (${HOST_IP}:${WIN_LISTENER_PORT})...`);
     
     const postData = JSON.stringify({ message: promptMessage, tool: toolName });
 
     const req = http.request({
         hostname: HOST_IP,
         port: WIN_LISTENER_PORT,
+        path: '/trigger-approval', // 确保路径正确
         method: 'POST',
         timeout: 120000,
         headers: {
@@ -76,59 +77,52 @@ const sendNetworkNotification = (promptMessage, toolName, callback) => {
             'Content-Length': Buffer.byteLength(postData)
         }
     }, (res) => {
+        console.log(`[HeyBuddy] 📥 收到 Windows 响应状态码: ${res.statusCode}`);
         let rawData = '';
         res.on('data', (chunk) => { rawData += chunk; });
         res.on('end', () => {
-            callback(rawData.trim());
+            const choice = rawData.trim();
+            console.log(`[HeyBuddy] 🆗 用户选择结果: ${choice}`);
+            callback(choice);
         });
     });
 
     req.on('error', (e) => {
-        console.error(`❌ 无法连接到 Windows 监听程序 (${HOST_IP})。`);
-        callback('CANCEL');
+        console.error(`[HeyBuddy] ❌ 网络连接失败: ${e.message}`);
+        console.error(`请检查：1. Windows 端 HeyBuddy 是否在运行 2. 防火墙是否放行了 19999 端口`);
+        callback('CANCEL'); // 失败默认发送取消信号
     });
 
     req.write(postData);
     req.end();
 };
 
-let muteUntil = 0; // 静默期时间戳
-
 app.post('/trigger-approval', (req, res) => {
     const receivedSessionId = req.body.session_id;
 
     if (receivedSessionId !== SESSION_ID) {
+        console.log(`[HeyBuddy] 🛡️ 拒绝了未授权的请求 (ID 不匹配)`);
         return res.status(403).send('Unauthorized');
     }
 
-    // 检查是否处于静默期 (Manual 模式后)
-    if (Date.now() < muteUntil) {
-        console.log('\n[HeyBuddy] 🔕 拦截器当前处于静默期 (Manual Mode)。已跳过 Windows 弹窗，请在终端内完成操作。');
-        return res.sendStatus(200);
-    }
-
-    const promptMessage = req.body.message || "请求操作";
+    const promptMessage = req.body.message || "请求确认";
     const toolName = req.body.tool || "Unknown";
 
-    console.log('\n[HeyBuddy] Received authorized approval request...');
+    console.log('\n[HeyBuddy] 🔔 收到 Gemini 授权 Hook...');
     sendNetworkNotification(promptMessage, toolName, (semanticChoice) => {
-        console.log(`[HeyBuddy] User chose: ${semanticChoice}. Mapping to PTY input...`);
-        
         let ptyInput = '';
         switch(semanticChoice) {
             case 'ALLOW':   ptyInput = '1\r'; break;
             case 'SESSION': ptyInput = '2\r'; break;
             case 'MANUAL':
-                // 设置 30 秒的静默期
-                muteUntil = Date.now() + 30000;
-                console.log(`\n[HeyBuddy] 🔀 已交回控制权。未来 30 秒内 HeyBuddy 将保持静默，请直接在 WSL 终端中完成所有的手动选项（包括打开编辑器的二次确认）。`);
-                return; // 直接返回，不向 PTY 注入任何字符
+                console.log(`[HeyBuddy] 🔀 进入手动模式，请在终端操作。`);
+                return;
             case 'CANCEL':  ptyInput = '\u001b'; break; // ESC 键
             default: ptyInput = '\u001b';
         }
 
         setTimeout(() => {
-            console.log(`[HeyBuddy] Injecting "${semanticChoice}" into PTY.`);
+            console.log(`[HeyBuddy] ⌨️ 注入指令: ${semanticChoice}`);
             ptyProcess.write(ptyInput);
         }, 1000);
     });
@@ -139,7 +133,6 @@ app.listen(port, () => {
     console.log('=========================================');
     console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
     console.log(`会话 ID: ${SESSION_ID}`);
-    console.log(`监听端口: ${port}`);
     console.log(`目标宿主机 IP: ${HOST_IP}`);
     console.log('=========================================');
 });
