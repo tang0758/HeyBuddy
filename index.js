@@ -6,13 +6,12 @@ const crypto = require('crypto');
 
 /**
  * HeyBuddy WSL 拦截器 (Interceptor)
- * 版本: v3.3 - 增强网络调试日志 (适配 Flutter 版)
+ * 版本: v3.5 - 增加灵活配置系统 (支持 HEYBUDDY_HOST 环境变量)
  */
 
-const VERSION = "v3.3";
+const VERSION = "v3.5";
 const app = express();
 const port = 18888;
-const WIN_LISTENER_PORT = 19999;
 
 const SESSION_ID = crypto.randomBytes(8).toString('hex');
 
@@ -30,7 +29,19 @@ const getHostIP = () => {
     return '127.0.0.1';
 };
 
-const HOST_IP = getHostIP();
+// --- 核心改进：配置优先级 (环境变量 > 自动探测) ---
+const configHost = process.env.HEYBUDDY_HOST; // 支持 "IP:PORT" 或 "IP"
+let HOST_IP;
+let WIN_LISTENER_PORT;
+
+if (configHost) {
+    const parts = configHost.split(':');
+    HOST_IP = parts[0];
+    WIN_LISTENER_PORT = parts[1] ? parseInt(parts[1]) : 19999;
+} else {
+    HOST_IP = getHostIP();
+    WIN_LISTENER_PORT = 19999;
+}
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
@@ -135,10 +146,5 @@ app.listen(port, () => {
     console.log(`会话 ID: ${SESSION_ID}`);
     console.log(`配置来源: ${process.env.HEYBUDDY_HOST ? '环境变量' : '自动探测'}`);
     console.log(`目标宿主机: ${HOST_IP}:${WIN_LISTENER_PORT}`);
-    console.log('=========================================');
-});
- console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
-    console.log(`会话 ID: ${SESSION_ID}`);
-    console.log(`目标宿主机 IP: ${HOST_IP}`);
     console.log('=========================================');
 });
