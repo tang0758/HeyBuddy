@@ -3,21 +3,26 @@ const express = require('express');
 const { execSync } = require('child_process');
 const http = require('http');
 const crypto = require('crypto');
+const os = require('os');
+const path = require('path');
 
 /**
- * HeyBuddy WSL 拦截器 (Interceptor)
- * 版本: v3.5 - 增加灵活配置系统 (支持 HEYBUDDY_HOST 环境变量)
+ * HeyBuddy 跨平台拦截器 (Interceptor)
+ * 版本: v3.8 - 完美支持 Windows/Linux/WSL 全平台
+ * 修复: Windows 下的进程启动寻址问题
  */
 
-const VERSION = "v3.5";
+const VERSION = "v3.8";
 const app = express();
 const port = 18888;
+const IS_WIN = os.platform() === 'win32';
 
 const SESSION_ID = crypto.randomBytes(8).toString('hex');
 
 app.use(express.json());
 
 const getHostIP = () => {
+    if (IS_WIN) return '127.0.0.1';
     try {
         const hostIp = execSync("grep nameserver /etc/resolv.conf | awk '{print $2}'").toString().trim();
         if (hostIp) return hostIp;
@@ -29,8 +34,17 @@ const getHostIP = () => {
     return '127.0.0.1';
 };
 
-// --- 核心改进：配置优先级 (环境变量 > 自动探测) ---
-const configHost = process.env.HEYBUDDY_HOST; // 支持 "IP:PORT" 或 "IP"
+const getExecutable = (cmd) => {
+    if (!IS_WIN) return cmd;
+    try {
+        const fullPath = execSync(`where ${cmd}`).toString().split('\r\n')[0].trim();
+        return fullPath;
+    } catch (e) {
+        return cmd.toLowerCase().endsWith('.cmd') ? cmd : `${cmd}.cmd`;
+    }
+};
+
+const configHost = process.env.HEYBUDDY_HOST;
 let HOST_IP;
 let WIN_LISTENER_PORT;
 
@@ -49,7 +63,9 @@ if (args.length === 0) {
     process.exit(1);
 }
 
-const ptyProcess = pty.spawn(args[0], args.slice(1), {
+const executable = getExecutable(args[0]);
+
+const ptyProcess = pty.spawn(executable, args.slice(1), {
     name: 'xterm-256color',
     cols: 160,
     rows: 40,
@@ -65,7 +81,10 @@ const ptyProcess = pty.spawn(args[0], args.slice(1), {
 
 ptyProcess.onData((data) => process.stdout.write(data));
 process.stdin.on('data', (data) => ptyProcess.write(data));
-if (process.stdin.isTTY) process.stdin.setRawMode(true);
+
+if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+}
 
 ptyProcess.onExit(({ exitCode }) => {
     console.log(`\n[HeyBuddy] Process exited with code ${exitCode}`);
@@ -74,66 +93,36 @@ ptyProcess.onExit(({ exitCode }) => {
 
 const sendNetworkNotification = (promptMessage, toolName, callback) => {
     console.log(`[HeyBuddy] 📡 正在发送请求到 Windows 宿主机 (${HOST_IP}:${WIN_LISTENER_PORT})...`);
-    
     const postData = JSON.stringify({ message: promptMessage, tool: toolName });
-
     const req = http.request({
-        hostname: HOST_IP,
-        port: WIN_LISTENER_PORT,
-        path: '/trigger-approval', // 确保路径正确
-        method: 'POST',
+        hostname: HOST_IP, port: WIN_LISTENER_PORT, path: '/trigger-approval', method: 'POST',
         timeout: 120000,
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData)
-        }
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) }
     }, (res) => {
-        console.log(`[HeyBuddy] 📥 收到 Windows 响应状态码: ${res.statusCode}`);
         let rawData = '';
         res.on('data', (chunk) => { rawData += chunk; });
-        res.on('end', () => {
-            const choice = rawData.trim();
-            console.log(`[HeyBuddy] 🆗 用户选择结果: ${choice}`);
-            callback(choice);
-        });
+        res.on('end', () => { callback(rawData.trim()); });
     });
-
     req.on('error', (e) => {
         console.error(`[HeyBuddy] ❌ 网络连接失败: ${e.message}`);
-        console.error(`请检查：1. Windows 端 HeyBuddy 是否在运行 2. 防火墙是否放行了 19999 端口`);
-        callback('CANCEL'); // 失败默认发送取消信号
+        callback('CANCEL');
     });
-
     req.write(postData);
     req.end();
 };
 
 app.post('/trigger-approval', (req, res) => {
-    const receivedSessionId = req.body.session_id;
-
-    if (receivedSessionId !== SESSION_ID) {
-        console.log(`[HeyBuddy] 🛡️ 拒绝了未授权的请求 (ID 不匹配)`);
-        return res.status(403).send('Unauthorized');
-    }
-
-    const promptMessage = req.body.message || "请求确认";
-    const toolName = req.body.tool || "Unknown";
-
-    console.log('\n[HeyBuddy] 🔔 收到 Gemini 授权 Hook...');
-    sendNetworkNotification(promptMessage, toolName, (semanticChoice) => {
+    if (req.body.session_id !== SESSION_ID) return res.status(403).send('Unauthorized');
+    sendNetworkNotification(req.body.message, req.body.tool, (semanticChoice) => {
         let ptyInput = '';
         switch(semanticChoice) {
             case 'ALLOW':   ptyInput = '1\r'; break;
             case 'SESSION': ptyInput = '2\r'; break;
-            case 'MANUAL':
-                console.log(`[HeyBuddy] 🔀 进入手动模式，请在终端操作。`);
-                return;
-            case 'CANCEL':  ptyInput = '\u001b'; break; // ESC 键
+            case 'MANUAL':  console.log(`[HeyBuddy] 🔀 已交回控制权。`); return;
+            case 'CANCEL':  ptyInput = '\u001b'; break;
             default: ptyInput = '\u001b';
         }
-
         setTimeout(() => {
-            console.log(`[HeyBuddy] ⌨️ 注入指令: ${semanticChoice}`);
             ptyProcess.write(ptyInput);
         }, 1000);
     });
@@ -142,9 +131,9 @@ app.post('/trigger-approval', (req, res) => {
 
 app.listen(port, () => {
     console.log('=========================================');
-    console.log(`🚀 HeyBuddy WSL 拦截器已启动 [版本: ${VERSION}]`);
+    console.log(`🚀 HeyBuddy 拦截器已启动 [版本: ${VERSION}]`);
     console.log(`会话 ID: ${SESSION_ID}`);
-    console.log(`配置来源: ${process.env.HEYBUDDY_HOST ? '环境变量' : '自动探测'}`);
+    console.log(`运行平台: ${os.platform()}`);
     console.log(`目标宿主机: ${HOST_IP}:${WIN_LISTENER_PORT}`);
     console.log('=========================================');
 });
