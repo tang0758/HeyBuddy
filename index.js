@@ -8,11 +8,10 @@ const path = require('path');
 
 /**
  * HeyBuddy 跨平台拦截器 (Interceptor)
- * 版本: v3.8 - 完美支持 Windows/Linux/WSL 全平台
- * 修复: Windows 下的进程启动寻址问题
+ * 版本: v3.9 - 修复 Windows Error 193 (通过 Shell 转发指令)
  */
 
-const VERSION = "v3.8";
+const VERSION = "v3.9";
 const app = express();
 const port = 18888;
 const IS_WIN = os.platform() === 'win32';
@@ -34,28 +33,13 @@ const getHostIP = () => {
     return '127.0.0.1';
 };
 
-const getExecutable = (cmd) => {
-    if (!IS_WIN) return cmd;
-    try {
-        const fullPath = execSync(`where ${cmd}`).toString().split('\r\n')[0].trim();
-        return fullPath;
-    } catch (e) {
-        return cmd.toLowerCase().endsWith('.cmd') ? cmd : `${cmd}.cmd`;
-    }
+// 获取 Windows 系统的 Shell (通常是 cmd.exe)
+const getShell = () => {
+    return IS_WIN ? (process.env.ComSpec || 'cmd.exe') : 'bash';
 };
 
-const configHost = process.env.HEYBUDDY_HOST;
-let HOST_IP;
-let WIN_LISTENER_PORT;
-
-if (configHost) {
-    const parts = configHost.split(':');
-    HOST_IP = parts[0];
-    WIN_LISTENER_PORT = parts[1] ? parseInt(parts[1]) : 19999;
-} else {
-    HOST_IP = getHostIP();
-    WIN_LISTENER_PORT = 19999;
-}
+const HOST_IP = getHostIP();
+const WIN_LISTENER_PORT = 19999;
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
@@ -63,9 +47,24 @@ if (args.length === 0) {
     process.exit(1);
 }
 
-const executable = getExecutable(args[0]);
+// --- 核心修复逻辑 ---
+let executable;
+let ptyArgs;
 
-const ptyProcess = pty.spawn(executable, args.slice(1), {
+if (IS_WIN) {
+    // Windows 下：启动 cmd.exe，并利用 /c 执行原始指令及其所有参数
+    executable = getShell();
+    // 将所有参数拼接成一个完整的字符串
+    const fullCommand = args.join(' ');
+    ptyArgs = ['/c', fullCommand];
+    console.log(`[HeyBuddy] Windows 环境：通过 Shell 转发指令 -> ${fullCommand}`);
+} else {
+    // Linux/WSL 下：保持原样
+    executable = args[0];
+    ptyArgs = args.slice(1);
+}
+
+const ptyProcess = pty.spawn(executable, ptyArgs, {
     name: 'xterm-256color',
     cols: 160,
     rows: 40,
@@ -113,6 +112,7 @@ const sendNetworkNotification = (promptMessage, toolName, callback) => {
 
 app.post('/trigger-approval', (req, res) => {
     if (req.body.session_id !== SESSION_ID) return res.status(403).send('Unauthorized');
+    console.log('\n[HeyBuddy] 🔔 收到 Gemini 授权 Hook...');
     sendNetworkNotification(req.body.message, req.body.tool, (semanticChoice) => {
         let ptyInput = '';
         switch(semanticChoice) {
@@ -123,6 +123,7 @@ app.post('/trigger-approval', (req, res) => {
             default: ptyInput = '\u001b';
         }
         setTimeout(() => {
+            console.log(`[HeyBuddy] ⌨️ 注入指令: ${semanticChoice}`);
             ptyProcess.write(ptyInput);
         }, 1000);
     });
@@ -132,8 +133,9 @@ app.post('/trigger-approval', (req, res) => {
 app.listen(port, () => {
     console.log('=========================================');
     console.log(`🚀 HeyBuddy 拦截器已启动 [版本: ${VERSION}]`);
-    console.log(`会话 ID: ${SESSION_ID}`);
     console.log(`运行平台: ${os.platform()}`);
+    console.log(`会话 ID: ${SESSION_ID}`);
+    console.log(`配置来源: ${process.env.HEYBUDDY_HOST ? '环境变量' : (IS_WIN ? '本地模式' : '自动探测')}`);
     console.log(`目标宿主机: ${HOST_IP}:${WIN_LISTENER_PORT}`);
     console.log('=========================================');
 });
